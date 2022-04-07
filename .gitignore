@@ -1,0 +1,15 @@
+**/bin
+
+**/obj
+
+*.ps1
+
+*/appsettings.*.json
+
+appsettings.*.json
+
+**/.vs
+
+**/.config
+
+**/PublishProfiles
