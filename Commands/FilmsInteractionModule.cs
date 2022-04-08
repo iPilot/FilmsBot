@@ -200,15 +200,16 @@ namespace FilmsBot.Commands
                 GuildId = guildChannel.GuildId,
                 Creator = user
             };
+
             DbContext.Sessions.Add(session);
 
-            return CommandResult.DefaultSuccess;
+            return new CommandResult("Voting started. Place your bets!");
         }
 
         [SlashCommand("vote", "Place vote for specified film")]
         public async Task<RuntimeResult> VoteForFilm(
             [Summary("film-name", "Name of film for vote"), Autocomplete(typeof(FilmNameAutocompleteHandler))] string filmName,
-            [Summary("amount", "Amount of money placed for film"), MinValue(0), MaxValue(MaxAmount)] int amount)
+            [Summary("amount", "Amount of money placed for film. Use 0 to remove vote."), MinValue(0), MaxValue(MaxAmount)] int amount)
         {
             if (!ValidateIfGuild(out var guildChannel, out var result))
                 return result;
@@ -234,6 +235,7 @@ namespace FilmsBot.Commands
             if (sum + amount > MaxAmount)
                 return new CommandResult(InteractionCommandError.Unsuccessful, $"Not enough money. Left: {MaxAmount - sum}");
 
+            string r;
             var existing = s.UserVotes.FirstOrDefault(v => v.FilmId == film.Id);
             if (existing == null)
             {
@@ -245,7 +247,9 @@ namespace FilmsBot.Commands
                     Participant = user,
                     Session = s.Session
                 };
+
                 DbContext.Votes.Add(existing);
+                r = $"Your placed {amount} for \"{film.Format()}\"";
             }
             else
             {
@@ -253,14 +257,16 @@ namespace FilmsBot.Commands
                 {
                     existing.Amount += amount;
                     existing.Date = DateTime.UtcNow;
+                    r = $"Added to bet. Your total bet for \"{film.Format()}\" is {existing.Amount}";
                 }
                 else
                 {
                     DbContext.Votes.Remove(existing);
+                    r = $"Your vote for \"{film.Format()}\" has been reset";
                 }
             }
 
-            return CommandResult.DefaultSuccess;
+            return new CommandResult(r);
         }
     }
 }
