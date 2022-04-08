@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FilmsBot.Migrations
 {
     [DbContext(typeof(FilmsBotDbContext))]
-    [Migration("20220404174234_Initial")]
+    [Migration("20220408110154_Initial")]
     partial class Initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -40,6 +40,10 @@ namespace FilmsBot.Migrations
                     b.Property<decimal>("AddedById")
                         .HasColumnType("numeric(20,0)")
                         .HasColumnName("ADDED_BY_ID");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("COMMENT");
 
                     b.Property<decimal>("GuildId")
                         .HasColumnType("numeric(20,0)")

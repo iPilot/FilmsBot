@@ -7,6 +7,13 @@ namespace FilmsBot.Commands
 {
     public class FilmNameAutocompleteHandler : AutocompleteHandler
     {
+        private readonly IServiceScopeFactory _scopeFactory;
+
+        public FilmNameAutocompleteHandler(IServiceScopeFactory scopeFactory)
+        {
+            _scopeFactory = scopeFactory;
+        }
+
         public override async Task<AutocompletionResult> GenerateSuggestionsAsync(
             IInteractionContext context,
             IAutocompleteInteraction autocompleteInteraction,
@@ -16,7 +23,8 @@ namespace FilmsBot.Commands
             if (context.Channel is not IGuildChannel guildChannel)
                 return AutocompletionResult.FromError(InteractionCommandError.UnmetPrecondition, "Not in a guild");
 
-            var db = services.GetRequiredService<FilmsBotDbContext>();
+            var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<FilmsBotDbContext>();
             var prefix = autocompleteInteraction.Data.Current.Value as string ?? "";
 
             var films = await db

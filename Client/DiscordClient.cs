@@ -1,13 +1,15 @@
 ﻿using Discord;
+using Discord.Interactions;
 using Discord.WebSocket;
-using FilmsBot.Commands.Abstractions;
+using FilmsBot.Commands;
 using ILogger = Serilog.ILogger;
 
 namespace FilmsBot.Client
 {
-    public partial class DiscordClient : IDisposable
+    public class DiscordClient : IDisposable
     {
-        private readonly Dictionary<string, ISlashCommandHandler> _slashCommands;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly FilmsInteractionService _filmsInteractionService;
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
         private readonly DiscordSocketClient _client;
@@ -15,12 +17,14 @@ namespace FilmsBot.Client
         private readonly CancellationTokenSource _tokenSource = new(-1);
         
         public DiscordClient(
+            IServiceProvider serviceProvider,
+            FilmsInteractionService filmsInteractionService,
             ILogger logger,
-            IEnumerable<ISlashCommandHandler> slashCommands,
             IConfiguration configuration,
             DiscordSocketClient client)
         {
-            _slashCommands = slashCommands.ToDictionary(c => c.Name);
+            _serviceProvider = serviceProvider;
+            _filmsInteractionService = filmsInteractionService;
             _logger = logger;
             _configuration = configuration;
             _client = client;
@@ -32,7 +36,7 @@ namespace FilmsBot.Client
             _thread.Start();
         }
 
-        public async void WaitForShutdown(CancellationToken cancellationToken)
+        private async void WaitForShutdown(CancellationToken cancellationToken)
         {
             await using var x = _client;
             
@@ -78,35 +82,25 @@ namespace FilmsBot.Client
                 }
                 return Task.CompletedTask;
             };
-            //_client.Ready += RegisterCommands;
-            //_client.SlashCommandExecuted += SlashCommandHandler;
+            _client.Ready += RegisterCommands;
+            _client.InteractionCreated += HandleInteraction;
         }
 
-        private async Task SlashCommandHandler(SocketSlashCommand command)
+        private Task HandleInteraction(SocketInteraction arg)
         {
-            if (!_slashCommands.TryGetValue(command.CommandName, out var slashCommand))
-            {
-                await command.RespondAsync("Error");
-                return;
-            }
+            //using var scope = _serviceProvider.CreateScope();
+            //await (arg switch
+            //{
+            //    SocketSlashCommand or SocketAutocompleteInteraction => _filmsInteractionService.ExecuteCommandAsync(new SocketInteractionContext(_client, arg), scope.ServiceProvider),
+            //    _ => Task.CompletedTask
+            //});
 
-            await slashCommand.HandleCommand(command);
+            return _filmsInteractionService.ExecuteCommandAsync(new SocketInteractionContext(_client, arg), _serviceProvider);
         }
 
         private async Task RegisterCommands()
         {
-            var registered = await _client.GetGlobalApplicationCommandsAsync();
-            foreach (var command in registered)
-            {
-#if DEBUG
-                await command.DeleteAsync();
-#else
-                if (!_slashCommands.ContainsKey(command.Name))
-                    await command.DeleteAsync();
-#endif
-            }
-
-            //await _client.BulkOverwriteGlobalApplicationCommandsAsync(_slashCommands.Select(c => c.Value.Command).Cast<ApplicationCommandProperties>().ToArray());
+            await _filmsInteractionService.Initialize();
         }
 
         private void ReleaseUnmanagedResources()

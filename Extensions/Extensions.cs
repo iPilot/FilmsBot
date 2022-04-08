@@ -1,31 +1,20 @@
 ﻿#nullable disable
-using Discord;
-using Discord.WebSocket;
+using System.Text;
 using FilmsBot.Database;
 
 namespace FilmsBot.Extensions
 {
     public static class Extensions
     {
-        public static T GetOptionValue<T>(this SocketSlashCommandDataOption data, string name)
+        public static async Task<Participant> GetParticipant(this FilmsBotDbContext db, ulong userId)
         {
-            var obj = data.Options.FirstOrDefault(o => o.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-
-            if (obj?.Value == null)
-                return default;
-
-            return MapByAppType<T>(obj.Type, obj.Value);
-        }
-
-        public static async Task<Participant> GetParticipant(this FilmsBotDbContext db, IUser user)
-        {
-            var p = await db.Participants.FindAsync(user.Id);
+            var p = await db.Participants.FindAsync(userId);
 
             if (p == null)
             {
                 p = new Participant
                 {
-                    Id = user.Id,
+                    Id = userId,
                     JoinedAt = DateTime.UtcNow
                 };
                 db.Participants.Add(p);
@@ -35,31 +24,28 @@ namespace FilmsBot.Extensions
             return p;
         }
 
-        public static T MapByAppType<T>(ApplicationCommandOptionType type, object value)
+        // {film} ({year}) [{rating}] // {comment}
+        public static string Format(this IEnumerable<Film> films, bool includeRating, bool includeComments)
         {
-            return type switch
-            {
-                ApplicationCommandOptionType.String => IsOfType<T>(typeof(string)) 
-                    ? Map<T>(value) 
-                    : throw new ArgumentException(nameof(value)),
-                ApplicationCommandOptionType.Integer => IsOfType<T>(typeof(int), typeof(int?), typeof(long), typeof(long?)) 
-                    ? Map<T>((long)value)
-                    : throw new ArgumentException(nameof(value)),
-                ApplicationCommandOptionType.Boolean => IsOfType<T>(typeof(bool), typeof(bool?)) 
-                    ? Map<T>(value) 
-                    : throw new ArgumentException(nameof(value)),
-                ApplicationCommandOptionType.User => IsOfType<T>(typeof(SocketUser)) 
-                    ? Map<T>(value) 
-                    : throw new ArgumentException(nameof(value)),
-                ApplicationCommandOptionType.Number => IsOfType<T>(typeof(double), typeof(double?)) 
-                    ? Map<T>(value) 
-                    : throw new ArgumentException(nameof(value)),
-                _ => throw new ArgumentException(nameof(value))
-            };
-        }
+            var sb = new StringBuilder();
 
-        private static T Map<T>(object v) => (T)v;
-        private static T Map<T>(long v) => typeof(T) == typeof(long) ? (T)(object)v : (T)(object) Convert.ToInt32(v);
-        private static bool IsOfType<T>(params Type[] types) => types.Any(t => t == typeof(T));
+            foreach (var film in films)
+            {
+                sb.Append(film.Name);
+                if (film.Year.HasValue)
+                    sb.Append($" ({film.Year.Value})");
+
+                if (includeRating && film.Ratings is { Count: > 0 })
+                {
+                    var avg = film.Ratings.Average(r => r.Rating);
+                    sb.Append($" [{avg:0.0}]");
+                }
+
+                if (includeComments && !string.IsNullOrWhiteSpace(film.Comment))
+                    sb.AppendFormat($"// {film.Comment}");
+            }
+
+            return sb.ToString();
+        }
     }
 }

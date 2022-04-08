@@ -1,26 +1,53 @@
-﻿using Discord;
+﻿using System.Diagnostics.CodeAnalysis;
+using Discord;
 using Discord.Interactions;
-using Discord.WebSocket;
 
 namespace FilmsBot.Commands.Abstractions
 {
-    public abstract class SlashSubCommandBase<TCommand> : InteractionModuleBase<SocketInteractionContext>, ISlashSubCommandHandler<TCommand>
-        where TCommand : SlashCommandBase
+    public abstract class SlashSubCommandBase : InteractionModuleBase<SocketInteractionContext>, IDisposable
     {
-        public abstract string Name { get; }
-        public abstract Task HandleCommand(SocketSlashCommand command, SocketSlashCommandDataOption options);
+        private readonly IServiceScopeFactory _scopeFactory;
+        protected ulong UserId => Context.User.Id;
+        protected IServiceScope? Scope;
 
-        public SlashCommandOptionBuilder GetOptionsBuilder()
+        protected SlashSubCommandBase(IServiceScopeFactory scopeFactory)
         {
-            return ConfigureSubCommand(
-                new SlashCommandOptionBuilder()
-                    .WithName(Name)
-                    .WithDescription(Description)
-                    .WithType(Type));
+            _scopeFactory = scopeFactory;
         }
 
-        protected abstract string Description { get; }
-        protected virtual ApplicationCommandOptionType Type => ApplicationCommandOptionType.SubCommand;
-        protected virtual SlashCommandOptionBuilder ConfigureSubCommand(SlashCommandOptionBuilder builder) => builder;
+        protected bool ValidateIfGuild([NotNullWhen(true)] out IGuildChannel? guildChannel, [NotNullWhen(false)] out RuntimeResult? result)
+        {
+            if (Context.Channel is IGuildChannel g)
+            {
+                guildChannel = g;
+                result = null;
+                return true;
+            }
+
+            guildChannel = null;
+            result = new CommandResult(InteractionCommandError.UnmetPrecondition, "Not in a guild");
+            return false;
+        }
+
+        public override void BeforeExecute(ICommandInfo command)
+        {
+            Scope = _scopeFactory.CreateScope();
+        }
+
+        public override void AfterExecute(ICommandInfo command)
+        {
+            Scope?.Dispose();
+        }
+
+        public void Dispose()
+        {
+            Scope?.Dispose();
+            GC.SuppressFinalize(this);
+        }
+
+        ~SlashSubCommandBase()
+        {
+            Dispose();
+        }
     }
 }

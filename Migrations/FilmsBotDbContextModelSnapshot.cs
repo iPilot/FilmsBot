@@ -39,6 +39,10 @@ namespace FilmsBot.Migrations
                         .HasColumnType("numeric(20,0)")
                         .HasColumnName("ADDED_BY_ID");
 
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("COMMENT");
+
                     b.Property<decimal>("GuildId")
                         .HasColumnType("numeric(20,0)")
                         .HasColumnName("GUILD_ID");

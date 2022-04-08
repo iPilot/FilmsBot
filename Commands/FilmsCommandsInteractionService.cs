@@ -1,22 +1,48 @@
-﻿using Discord.Interactions;
-using FilmsBot.Database;
+﻿using Discord;
+using Discord.Interactions;
+using Discord.WebSocket;
+using IResult = Discord.Interactions.IResult;
 
 namespace FilmsBot.Commands
 {
-    [Group("фильмы", "Менеджмент совместных просмотров фильмов")]
-    public class FilmsInteractionModule : InteractionModuleBase<SocketInteractionContext>
+    public class FilmsInteractionService : InteractionService
     {
-        private readonly FilmsBotDbContext _filmsDb;
+        private readonly IServiceProvider _serviceProvider;
 
-        public FilmsInteractionModule(FilmsBotDbContext filmsDb)
+        public FilmsInteractionService(DiscordSocketClient client, IServiceProvider serviceProvider) : base(client, new InteractionServiceConfig
         {
-            _filmsDb = filmsDb;
+            EnableAutocompleteHandlers = true,
+            AutoServiceScopes = true,
+            DefaultRunMode = RunMode.Async,
+            LogLevel = LogSeverity.Verbose,
+            UseCompiledLambda = true
+        })
+        {
+            _serviceProvider = serviceProvider;
+            SlashCommandExecuted += PostExecution;
         }
 
-        [SlashCommand("все", "Список всех фильмов")]
-        public async Task AllFilms()
+        private static async Task PostExecution(SlashCommandInfo command, IInteractionContext context, IResult result)
         {
-            await Context.Interaction.RespondAsync("ВСЕ");
+            if (context.Interaction.HasResponded)
+                return;
+
+            if (result.IsSuccess)
+                await context.Interaction.RespondAsync("OK");
+            else
+                await context.Interaction.RespondAsync(result.ToString());
+        }
+
+        public async Task Initialize()
+        {
+            //var m = new List<ModuleInfo>();
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                await AddModulesAsync(assembly, _serviceProvider);
+                //m.AddRange(await AddModulesAsync(assembly, _serviceProvider));
+            }
+
+            await RegisterCommandsGloballyAsync();
         }
     }
 }

@@ -16,6 +16,9 @@ namespace FilmsBot.Database
         [Column("NAME", TypeName = "citext")]
         public string Name { get; set; } = null!;
 
+        [Column("COMMENT")]
+        public string? Comment { get; set; }
+
         [Column("YEAR")]
         public int? Year { get; set; }
 

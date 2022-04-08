@@ -29,6 +29,7 @@ namespace FilmsBot.Migrations
                     ID = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     NAME = table.Column<string>(type: "citext", nullable: false),
+                    COMMENT = table.Column<string>(type: "text", nullable: true),
                     YEAR = table.Column<int>(type: "integer", nullable: true),
                     ADDED_BY_ID = table.Column<decimal>(type: "numeric(20,0)", nullable: false),
                     GUILD_ID = table.Column<decimal>(type: "numeric(20,0)", nullable: false),
