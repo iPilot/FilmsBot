@@ -215,7 +215,7 @@ namespace FilmsBot.Commands
                 return result;
 
             var user = await DbContext.GetParticipant(UserId);
-            var s = await DbContext.Sessions.Where(s => s.GuildId == guildChannel.GuildId).Select(s => new
+            var s = await DbContext.Sessions.Where(s => s.GuildId == guildChannel.GuildId && s.End == null).Select(s => new
             {
                 Session = s,
                 UserVotes = s.Votes!.Where(v => v.ParticipantId == UserId).ToList()
