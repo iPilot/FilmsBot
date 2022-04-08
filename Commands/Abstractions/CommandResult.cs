@@ -12,7 +12,7 @@ namespace FilmsBot.Commands.Abstractions
         {
         }
 
-        public override string ToString() => IsSuccess ? ErrorReason : $"Error ({Error}): {ErrorReason}";
+        public override string ToString() => IsSuccess ? ErrorReason : $"Error: {ErrorReason}";
         public static readonly CommandResult DefaultSuccess = new("");
     }
 }
