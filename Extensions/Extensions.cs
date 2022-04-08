@@ -23,8 +23,7 @@ namespace FilmsBot.Extensions
 
             return p;
         }
-
-        // {film} ({year}) [{rating}] // {comment}
+        
         public static string Format(this IEnumerable<Film> films, bool includeRating, bool includeComments)
         {
             var sb = new StringBuilder();
@@ -38,14 +37,18 @@ namespace FilmsBot.Extensions
                 if (includeRating && film.Ratings is { Count: > 0 })
                 {
                     var avg = film.Ratings.Average(r => r.Rating);
-                    sb.Append($" [{avg:0.0}]");
+                    sb.Append($" --- [ {avg:0.0} ] ---");
                 }
 
                 if (includeComments && !string.IsNullOrWhiteSpace(film.Comment))
-                    sb.AppendFormat($"// {film.Comment}");
+                    sb.AppendFormat($" || {film.Comment} ||");
+
+                sb.AppendLine();
             }
 
             return sb.ToString();
         }
+
+        public static string Format(this Film film) => film.Year.HasValue ? $"{film.Name} ({film.Year})" : film.Name;
     }
 }

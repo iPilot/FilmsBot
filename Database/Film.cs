@@ -57,10 +57,5 @@ namespace FilmsBot.Database
         }
 
         #endregion
-
-        public string Format()
-        {
-            return Year.HasValue ? $"{Name} ({Year})" : Name;
-        }
     }
 }

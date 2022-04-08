@@ -29,9 +29,9 @@ namespace FilmsBot.Commands
 
             var films = await db
                 .Films
-                .Where(f => f.GuildId == guildChannel.GuildId && f.Name.StartsWith(prefix))
+                .Where(f => f.GuildId == guildChannel.GuildId && EF.Functions.ILike(f.Name, $"%{prefix}%"))
                 .OrderBy(f => f.Name)
-                .Take(8)
+                .Take(10)
                 .Select(f => new AutocompleteResult(f.Name, f.Name))
                 .ToArrayAsync();
 

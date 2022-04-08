@@ -30,7 +30,7 @@ namespace FilmsBot.Commands
                 JoinedAt = DateTime.UtcNow
             });
 
-            return CommandResult.Success;
+            return new CommandResult("Prepare to watch!");
         }
 
         [SlashCommand("add", "Addition a new films to watch wishlist")]
@@ -43,7 +43,7 @@ namespace FilmsBot.Commands
                 return result;
 
             if (await DbContext.Films.AnyAsync(f => f.Name == filmName && f.Year == year && f.GuildId == guildChannel.GuildId))
-                return new CommandResult(InteractionCommandError.Unsuccessful, "Already added");
+                return new CommandResult(InteractionCommandError.Unsuccessful, "Film already added");
 
             var user = await DbContext.Participants.FindAsync(UserId);
             if (user == null)
@@ -68,7 +68,7 @@ namespace FilmsBot.Commands
 
             DbContext.Films.Add(film);
 
-            return CommandResult.Success;
+            return new CommandResult($"Added \"{film.Format()}\"");
         }
 
         [SlashCommand("vote-end", "Complete vote for next film")]
@@ -83,7 +83,7 @@ namespace FilmsBot.Commands
 
             session.End = DateTime.UtcNow;
 
-            return CommandResult.Success;
+            return new CommandResult("Voting has completed");
         }
 
         [SlashCommand("all", "A list of all films added to wish-list")]
@@ -94,20 +94,16 @@ namespace FilmsBot.Commands
             if (!ValidateIfGuild(out var guildChannel, out var result))
                 return result;
 
-            var films = await DbContext
+            IQueryable<Film> q = DbContext
                 .Films
                 .Where(f => f.GuildId == guildChannel.GuildId)
-                .OrderBy(f => f.AddedAt)
-                .ToListAsync();
+                .OrderBy(f => f.AddedAt);
 
-            if (films.Count == 0)
-            {
-                return new CommandResult(InteractionCommandError.Unsuccessful, "Films not registered");
-            }
+            var  films = await (includeRatings ? q.Include(f => f.Ratings) : q).ToListAsync();
 
-            await Context.Interaction.RespondAsync(films.Format(includeComments, includeRatings));
-
-            return CommandResult.Success;
+            return films.Count == 0 
+                ? new CommandResult(InteractionCommandError.Unsuccessful, "Films not registered") 
+                : new CommandResult(films.Format(includeRatings, includeComments));
         }
 
         [SlashCommand("load", "Load all films formatted for \"Pointauc\"")]
@@ -139,7 +135,7 @@ namespace FilmsBot.Commands
             });
             await Context.Interaction.RespondWithFileAsync(stream, $"report-{Guid.NewGuid():N}.json");
 
-            return CommandResult.Success;
+            return CommandResult.DefaultSuccess;
         }
 
         [SlashCommand("rate", "Set personal rating for specified film")]
@@ -183,7 +179,7 @@ namespace FilmsBot.Commands
                 rate.Date = DateTime.UtcNow;
             }
 
-            return CommandResult.Success;
+            return new CommandResult($"You rate \"{film.Film.Format()}\" as {rating:0.0} ");
         }
 
         [SlashCommand("vote-start", "Start voting for next film")]
@@ -206,11 +202,11 @@ namespace FilmsBot.Commands
             };
             DbContext.Sessions.Add(session);
 
-            return CommandResult.Success;
+            return CommandResult.DefaultSuccess;
         }
 
         [SlashCommand("vote", "Place vote for specified film")]
-        public async Task<RuntimeResult> Handle(
+        public async Task<RuntimeResult> VoteForFilm(
             [Summary("film-name", "Name of film for vote"), Autocomplete(typeof(FilmNameAutocompleteHandler))] string filmName,
             [Summary("amount", "Amount of money placed for film"), MinValue(0), MaxValue(MaxAmount)] int amount)
         {
@@ -264,7 +260,7 @@ namespace FilmsBot.Commands
                 }
             }
 
-            return CommandResult.Success;
+            return CommandResult.DefaultSuccess;
         }
     }
 }

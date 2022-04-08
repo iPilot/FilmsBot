@@ -4,10 +4,15 @@ namespace FilmsBot.Commands.Abstractions
 {
     public class CommandResult : RuntimeResult
     {
-        public CommandResult(InteractionCommandError? error, string reason) : base(error, reason)
+        public CommandResult(InteractionCommandError? error, string response) : base(error, response)
         {
         }
 
-        public static readonly CommandResult Success = new(null, string.Empty);
+        public CommandResult(string response) : base(null, response)
+        {
+        }
+
+        public override string ToString() => IsSuccess ? ErrorReason : $"Error ({Error}): {ErrorReason}";
+        public static readonly CommandResult DefaultSuccess = new("");
     }
 }

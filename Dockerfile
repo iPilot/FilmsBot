@@ -18,4 +18,9 @@ RUN dotnet publish "FilmsBot.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+
+ENV LANG en_US.UTF-8  
+ENV LANGUAGE en_US:en  
+ENV LC_ALL en_US.UTF-8   
+
 ENTRYPOINT ["dotnet", "FilmsBot.dll"]

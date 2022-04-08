@@ -17,5 +17,13 @@ namespace FilmsBot.Commands.Abstractions
             base.BeforeExecute(command);
             DbContext = Scope!.ServiceProvider.GetRequiredService<TContext>();
         }
+
+        public override async Task AfterExecuteAsync(ICommandInfo command)
+        {
+            if (DbContext.ChangeTracker.HasChanges())
+                await DbContext.SaveChangesAsync();
+
+            Scope?.Dispose();
+        }
     }
 }

@@ -34,9 +34,10 @@ namespace FilmsBot.Commands.Abstractions
             Scope = _scopeFactory.CreateScope();
         }
 
-        public override void AfterExecute(ICommandInfo command)
+        public override async Task AfterExecuteAsync(ICommandInfo command)
         {
             Scope?.Dispose();
+            await Task.CompletedTask;
         }
 
         public void Dispose()

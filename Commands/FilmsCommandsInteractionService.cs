@@ -27,19 +27,14 @@ namespace FilmsBot.Commands
             if (context.Interaction.HasResponded)
                 return;
 
-            if (result.IsSuccess)
-                await context.Interaction.RespondAsync("OK");
-            else
-                await context.Interaction.RespondAsync(result.ToString());
+            await context.Interaction.RespondAsync(result.ToString());
         }
 
         public async Task Initialize()
         {
-            //var m = new List<ModuleInfo>();
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 await AddModulesAsync(assembly, _serviceProvider);
-                //m.AddRange(await AddModulesAsync(assembly, _serviceProvider));
             }
 
             await RegisterCommandsGloballyAsync();
