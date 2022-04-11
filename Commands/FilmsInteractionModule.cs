@@ -33,7 +33,7 @@ namespace FilmsBot.Commands
             return new CommandResult("Prepare to watch!");
         }
 
-        [SlashCommand("add", "Addition a new films to watch wishlist")]
+        [SlashCommand("add", "Addition a new films to watch wish-list")]
         public async Task<RuntimeResult> AddFilm(
             [Summary("film-name", "A new film name")] string filmName,
             [Summary("film-year", "The year of film release"), MinValue(1900), MaxValue(2100)] int? year = null,
@@ -42,7 +42,12 @@ namespace FilmsBot.Commands
             if (!ValidateIfGuild(out var guildChannel, out var result))
                 return result;
 
-            if (await DbContext.Films.AnyAsync(f => f.Name == filmName && f.Year == year && f.GuildId == guildChannel.GuildId))
+            filmName = string.Join(' ', filmName.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+            if (string.IsNullOrWhiteSpace(filmName))
+                return new CommandResult(InteractionCommandError.UnmetPrecondition, "Film name cannot be empty");
+
+            if (await DbContext.Films.AnyAsync(f => EF.Functions.ILike(f.Name, filmName) && f.Year == year && f.GuildId == guildChannel.GuildId))
                 return new CommandResult(InteractionCommandError.Unsuccessful, "Film already added");
 
             var user = await DbContext.Participants.FindAsync(UserId);
@@ -63,7 +68,7 @@ namespace FilmsBot.Commands
                 AddedBy = user,
                 Year = year,
                 AddedAt = DateTime.UtcNow,
-                Comment = comment
+                Comment = comment?.RemoveExcessSpaces()
             };
 
             DbContext.Films.Add(film);
@@ -88,8 +93,8 @@ namespace FilmsBot.Commands
 
         [SlashCommand("all", "A list of all films added to wish-list")]
         public async Task<RuntimeResult> GetAllFilmsData(
-            [Summary("include-ratings", "Attach ratings for watched films")] bool includeRatings = false,
-            [Summary("include-comments", "Attach stored comments for films")] bool includeComments = false)
+            [Summary("ratings", "Attach ratings for watched films")] bool includeRatings = false,
+            [Summary("comments", "Attach stored comments for films")] bool includeComments = false)
         {
             if (!ValidateIfGuild(out var guildChannel, out var result))
                 return result;
@@ -101,9 +106,7 @@ namespace FilmsBot.Commands
 
             var  films = await (includeRatings ? q.Include(f => f.Ratings) : q).ToListAsync();
 
-            return films.Count == 0 
-                ? new CommandResult(InteractionCommandError.Unsuccessful, "Films not registered") 
-                : new CommandResult(films.Format(includeRatings, includeComments));
+            return new CommandResult(films.Count == 0 ? "Films not registered" : films.Format(includeRatings, includeComments));
         }
 
         [SlashCommand("load", "Load all films formatted for \"Pointauc\"")]
@@ -249,7 +252,7 @@ namespace FilmsBot.Commands
                 };
 
                 DbContext.Votes.Add(existing);
-                r = $"Your placed {amount} for \"{film.Format()}\"";
+                r = $"You placed {amount} for \"{film.Format()}\"";
             }
             else
             {

@@ -49,6 +49,11 @@ namespace FilmsBot.Extensions
             return sb.ToString();
         }
 
+        public static string RemoveExcessSpaces(this string s)
+        {
+            return string.Join(' ', s.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+
         public static string Format(this Film film) => film.Year.HasValue ? $"{film.Name} ({film.Year})" : film.Name;
     }
 }

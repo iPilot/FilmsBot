@@ -88,19 +88,12 @@ namespace FilmsBot.Client
 
         private Task HandleInteraction(SocketInteraction arg)
         {
-            //using var scope = _serviceProvider.CreateScope();
-            //await (arg switch
-            //{
-            //    SocketSlashCommand or SocketAutocompleteInteraction => _filmsInteractionService.ExecuteCommandAsync(new SocketInteractionContext(_client, arg), scope.ServiceProvider),
-            //    _ => Task.CompletedTask
-            //});
-
             return _filmsInteractionService.ExecuteCommandAsync(new SocketInteractionContext(_client, arg), _serviceProvider);
         }
 
-        private async Task RegisterCommands()
+        private Task RegisterCommands()
         {
-            await _filmsInteractionService.Initialize();
+            return _filmsInteractionService.Initialize();
         }
 
         private void ReleaseUnmanagedResources()

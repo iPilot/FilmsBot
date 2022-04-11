@@ -27,7 +27,7 @@ namespace FilmsBot.Commands
             if (context.Interaction.HasResponded)
                 return;
 
-            await context.Interaction.RespondAsync(result.ToString());
+            await context.Interaction.RespondAsync(result.ToString(), ephemeral: !result.IsSuccess);
         }
 
         public async Task Initialize()
