@@ -84,6 +84,16 @@ namespace FilmsBot.Client
             };
             _client.Ready += RegisterCommands;
             _client.InteractionCreated += HandleInteraction;
+            _client.ButtonExecuted += ButtonExecuted;
+        }
+
+        private Task ButtonExecuted(SocketMessageComponent arg)
+        {
+            return arg.Data.Type switch
+            {
+                ComponentType.Button => _filmsInteractionService.ProcessButtonExecution(arg),
+                _ => arg.RespondAsync("invalid component")
+            };
         }
 
         private Task HandleInteraction(SocketInteraction arg)

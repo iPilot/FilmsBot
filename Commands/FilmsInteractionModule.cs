@@ -1,5 +1,7 @@
 ﻿using System.Text.Json;
+using Discord;
 using Discord.Interactions;
+using Discord.WebSocket;
 using FilmsBot.Commands.Abstractions;
 using FilmsBot.Database;
 using FilmsBot.Extensions;
@@ -10,12 +12,19 @@ namespace FilmsBot.Commands
     [Group(ConstName, ConstDesc)]
     public class FilmsInteractionModule : DbInteractionSubCommand<FilmsBotDbContext>
     {
+        private readonly IBotDeveloperProvider _developerProvider;
+        private readonly FilmsEmbeddingFactory _embeddingFactory;
         private const string ConstName = "films";
         private const string ConstDesc = "Cooperative films watch management";
         private const int MaxAmount = 1000;
 
-        public FilmsInteractionModule(IServiceScopeFactory scopeFactory) : base(scopeFactory)
+        private static string GetRatingsComponentsId(ulong guildId) => $"films-ratings;{guildId}";
+        private static string GetListComponentsId(bool ratings, bool comments) => $"films-list;{ratings};{comments}";
+
+        public FilmsInteractionModule(IServiceScopeFactory scopeFactory, IBotDeveloperProvider developerProvider, FilmsEmbeddingFactory embeddingFactory) : base(scopeFactory)
         {
+            _developerProvider = developerProvider;
+            _embeddingFactory = embeddingFactory;
         }
 
         [SlashCommand("watch", "Join to watchers")]
@@ -99,14 +108,15 @@ namespace FilmsBot.Commands
             if (!ValidateIfGuild(out var guildChannel, out var result))
                 return result;
 
-            IQueryable<Film> q = DbContext
-                .Films
-                .Where(f => f.GuildId == guildChannel.GuildId)
-                .OrderBy(f => f.AddedAt);
+            var totalFilms = await DbContext.Films.Where(f => f.GuildId == guildChannel.GuildId).CountAsync();
+            var embed = await _embeddingFactory.GetListEmbed(DbContext, guildChannel, 1, includeRatings, includeComments);
+            var components = _embeddingFactory.GetButtonsForList(GetListComponentsId(includeRatings, includeComments), totalFilms, 1);
 
-            var  films = await (includeRatings ? q.Include(f => f.Ratings) : q).ToListAsync();
+            await Context
+                .Interaction
+                .RespondAsync(embed: embed, components: components);
 
-            return new CommandResult(films.Count == 0 ? "Films not registered" : films.Format(includeRatings, includeComments));
+            return CommandResult.DefaultSuccess;
         }
 
         [SlashCommand("load", "Load all films formatted for \"Pointauc\"")]
@@ -195,7 +205,7 @@ namespace FilmsBot.Commands
             var session = await DbContext.Sessions.FirstOrDefaultAsync(s => s.GuildId == guildChannel.GuildId && s.End == null);
 
             if (session != null)
-                return new CommandResult(InteractionCommandError.Unsuccessful, "Голосование уже идет");
+                return new CommandResult(InteractionCommandError.Unsuccessful, "Voting is in progress");
 
             session = new Session
             {
@@ -270,6 +280,153 @@ namespace FilmsBot.Commands
             }
 
             return new CommandResult(r);
+        }
+
+        [SlashCommand("ratings", "Get films ratings")]
+        public async Task<RuntimeResult> GetFilmRatings([Summary("filmName", "Name of film"), Autocomplete(typeof(FilmNameAutocompleteHandler))] string filmName)
+        { 
+            if (!ValidateIfGuild(out var guildChannel, out var result))
+                return result;
+
+            var film = await DbContext
+                .Films
+                .Where(r => r.GuildId == guildChannel.GuildId && EF.Functions.ILike(r.Name, $"%{filmName}%"))
+                .Select(f => new
+                {
+                    Film = f,
+                    f.Ratings!.Count,
+                    Average = f.Ratings!.Select(r => r.Rating).Average()
+                })
+                .FirstOrDefaultAsync();
+
+            Embed embed;
+            MessageComponent? component = null;
+            if (film == null)
+            {
+                embed = _embeddingFactory.GetNotFoundEmbed($"\"{filmName}\"", "Film not found");
+            }
+            else
+            {
+                embed = await _embeddingFactory.GetRatingsEmbed(DbContext, film.Film, film.Count, film.Average, 1);
+                component = _embeddingFactory.GetButtonsForList($"films-ratings;{guildChannel.GuildId}", film.Count, 1);
+            }
+
+            await Context
+                .Interaction
+                .RespondAsync(null, embed: embed, components: component);
+
+            return CommandResult.DefaultSuccess;
+        }
+
+        public async Task ProcessButtonExecution(SocketMessageComponent component)
+        {
+            var parsedId = component.Data.CustomId.Split(";", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parsedId.Length == 0)
+            {
+                await component.RespondAsync("invalid id");
+                return;
+            }
+
+            switch (parsedId[0])
+            {
+                case "films-ratings":
+                {
+                    await ProcessRatingsPaging(component, parsedId);
+                    break;
+                }
+                case "films-list":
+                {
+                    await ProcessListPaging(component, parsedId);
+                    return;
+                }
+                default:
+                {
+                    await component.RespondAsync("invalid id");
+                    return;
+                }
+            }
+        }
+
+        private async Task ProcessListPaging(SocketMessageComponent component, IReadOnlyList<string> parsedArgs)
+        {
+            if (component.Channel is not IGuildChannel guildChannel)
+            {
+                await component.RespondAsync("not in a guild");
+                return;
+            }
+            
+            int page;
+            bool ratings;
+            bool comments;
+            try
+            {
+                ratings = bool.Parse(parsedArgs[1]);
+                comments = bool.Parse(parsedArgs[2]);
+                page = int.Parse(parsedArgs[3]);
+            }
+            catch (Exception)
+            {
+                await component.RespondAsync("invalid id");
+                return;
+            }
+
+            var totalFilms = await DbContext.Films.Where(f => f.GuildId == guildChannel.GuildId).CountAsync();
+            var newEmbed = await _embeddingFactory.GetListEmbed(DbContext, guildChannel, page, ratings, comments);
+            var newComponents = _embeddingFactory.GetButtonsForList(GetListComponentsId(ratings, comments), totalFilms, page);
+
+            await component.UpdateAsync(p =>
+            {
+                p.Embed = newEmbed;
+                p.Components = newComponents;
+            });
+        }
+
+        private async Task ProcessRatingsPaging(SocketMessageComponent component, IReadOnlyList<string> parsedArgs)
+        {
+            if (component.Channel is not IGuildChannel guildChannel)
+            {
+                await component.RespondAsync("not in a guild");
+                return;
+            }
+
+            long filmId;
+            int page;
+            try
+            {
+                filmId = long.Parse(parsedArgs[1]);
+                page = int.Parse(parsedArgs[2]);
+            }
+            catch (Exception)
+            {
+                await component.RespondAsync("invalid id");
+                return;
+            }
+
+            var film = await DbContext
+                .Films
+                .Where(r => r.GuildId == guildChannel.GuildId && r.Id == filmId)
+                .Select(f => new
+                {
+                    Film = f,
+                    f.Ratings!.Count,
+                    Average = f.Ratings!.Select(r => r.Rating).Average()
+                })
+                .FirstOrDefaultAsync();
+
+            if (film == null)
+            {
+                await component.RespondAsync("invalid id");
+                return;
+            }
+
+            var newEmbed = await _embeddingFactory.GetRatingsEmbed(DbContext, film.Film, film.Count, film.Average, page);
+            var newComponents = _embeddingFactory.GetButtonsForList(GetRatingsComponentsId(guildChannel.GuildId), film.Count, page);
+
+            await component.UpdateAsync(p =>
+            {
+                p.Embed = newEmbed;
+                p.Components = newComponents;
+            });
         }
     }
 }

@@ -1,5 +1,4 @@
 using Discord;
-using Discord.Interactions;
 using Discord.WebSocket;
 using FilmsBot;
 using FilmsBot.Client;
@@ -12,13 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile($"conf/appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", true, false);
 
 builder.Services.AddSingleton<DiscordClient>();
-builder.Services.Scan(s => s
-    .FromApplicationDependencies()
-    .AddClasses(a => a.AssignableTo<InteractionModuleBase>())
-    .As<InteractionModuleBase>()
-    .AsSelf()
-    .WithTransientLifetime());
-
+builder.Services.AddTransient<FilmsInteractionModule>();
 builder.Services.AddSingleton<FilmsInteractionService>();
 builder.Services.AddDbContextPool<FilmsBotDbContext>(o =>
 {
@@ -32,6 +25,7 @@ builder.Services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
     MessageCacheSize = 250,
     LogLevel = LogSeverity.Verbose
 }));
+builder.Services.AddSingleton<FilmsEmbeddingFactory>();
 builder.Services.AddSingleton<IBotDeveloperProvider, BotDeveloperProvider>();
 builder.Host.UseSerilog((_, c) => c.ReadFrom.Configuration(builder.Configuration));
 

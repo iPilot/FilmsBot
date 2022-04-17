@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using FilmsBot.Commands.Abstractions;
 using IResult = Discord.Interactions.IResult;
 
 namespace FilmsBot.Commands
@@ -24,7 +25,7 @@ namespace FilmsBot.Commands
 
         private static async Task PostExecution(SlashCommandInfo command, IInteractionContext context, IResult result)
         {
-            if (context.Interaction.HasResponded)
+            if (context.Interaction.HasResponded || result.Equals(CommandResult.DefaultSuccess))
                 return;
 
             await context.Interaction.RespondAsync(result.ToString(), ephemeral: !result.IsSuccess);
@@ -38,6 +39,20 @@ namespace FilmsBot.Commands
             }
 
             await RegisterCommandsGloballyAsync();
+        }
+
+        public async Task ProcessButtonExecution(SocketMessageComponent component)
+        {
+            if (component.Data.Type != ComponentType.Button)
+            {
+                await component.RespondAsync("invalid component");
+                return;
+            }
+
+            using var module = _serviceProvider.GetRequiredService<FilmsInteractionModule>();
+            module.BeforeExecute(null);
+
+            await module.ProcessButtonExecution(component);
         }
     }
 }
