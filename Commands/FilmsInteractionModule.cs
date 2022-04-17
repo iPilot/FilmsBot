@@ -6,6 +6,7 @@ using FilmsBot.Commands.Abstractions;
 using FilmsBot.Database;
 using FilmsBot.Extensions;
 using Microsoft.EntityFrameworkCore;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace FilmsBot.Commands
 {
@@ -127,19 +128,29 @@ namespace FilmsBot.Commands
 
             var data = await DbContext
                 .Films.Where(f => f.GuildId == guildChannel.GuildId && f.Session == null)
-                .Select(f => new
+                .Select(f => new PointAucEntryModel
                 {
-                    name = f.Name,
-                    amount = f.Votes!.Select(v => v.Amount).Sum(),
-                    id = f.Id.ToString(),
-                    fastId = f.Id,
-                    extra = (string?)null
+                    Name = f.Name,
+                    Amount = f.Votes!.Select(v => v.Amount).Sum(),
+                    Id = f.Id.ToString(),
+                    FastId = 0,
+                    Extra = null
                 })
-                .OrderBy(d => d.fastId)
                 .ToListAsync();
 
             if (data.Count == 0)
                 return new CommandResult(InteractionCommandError.Unsuccessful, "Films list is empty");
+
+            data = data
+                .Where(d => d.Amount > 0)
+                .OrderByDescending(e => e.Amount)
+                .ThenBy(e => e.Id)
+                .Select((e, i) =>
+                {
+                    e.FastId = i;
+                    return e;
+                })
+                .ToList();
 
             await using var stream = new MemoryStream();
             await JsonSerializer.SerializeAsync(stream, data, new JsonSerializerOptions
