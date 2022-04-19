@@ -8,7 +8,7 @@ namespace FilmsBot.Commands
 {
     public class FilmsEmbeddingFactory
     {
-        private const int PageSize = 10;
+        private const int PageSize = 8;
 
         public Embed GetNotFoundEmbed(string title, string description)
         {
@@ -79,19 +79,15 @@ namespace FilmsBot.Commands
         public async Task<Embed> GetListEmbed(FilmsBotDbContext dbContext, IGuildChannel guildChannel, int page, bool includeRatings, bool includeComments)
         {
             page = Math.Max(0, page - 1);
-            var q = dbContext
+            var films = await dbContext
                 .Films
-                .Where(f => f.GuildId == guildChannel.GuildId);
-
-            if (includeRatings)
-                q = q
-                    .OrderByDescending(f => f.Ratings!.Select(r => r.Rating).Average())
-                    .ThenBy(f => f.Name)
-                    .Include(f => f.Ratings);
-            else
-                q = q.OrderBy(f => f.Name);
-
-            var films = await q
+                .Where(f => f.GuildId == guildChannel.GuildId)
+                .Select(f => new
+                {
+                    Film = f,
+                    Rating = (double?) f.Ratings.Average(r => r.Rating)
+                })
+                .OrderByDescending(f => f.Rating ?? 0)
                 .Skip(page * PageSize)
                 .Take(PageSize)
                 .ToListAsync();
@@ -112,30 +108,28 @@ namespace FilmsBot.Commands
                     .WithFooter($"Page {page + 1} of {(int)Math.Ceiling(totalFilms / (double)PageSize)}{Environment.NewLine}Total films: {totalFilms}");
             }
 
-            var sb = new StringBuilder();
-            var i = page * PageSize + 1;  
-            foreach (var film in films)
+            IEnumerable<EmbedFieldBuilder> GetFields()
             {
-                var n = $"**{i++}. {film.Format()}**";
-                sb.Append(n);
-
-                if (includeRatings && film.Ratings is { Count: > 0 })
+                var i = page * PageSize + 1;
+                foreach (var film in films)
                 {
-                    var avg = film.Ratings.Average(r => r.Rating);
-                    sb.Append(' ');
-                    sb.Append('-', 40 - n.Length);
-                    sb.Append($" ** [ {avg:0.0} ] ** ");
+                    var b = new EmbedFieldBuilder();
+                    b.WithName($"**{i++}. {film.Film.Format()}**");
+
+                    var value = $"Rating: {film.Rating?.ToString("0.#") ?? "No rating"}";
+
+                    if (includeComments && !string.IsNullOrWhiteSpace(film.Film.Comment))
+                        value = $"{film.Film.Comment}{Environment.NewLine}" + value;
+
+                    b.WithValue(value);
+
+                    yield return b;
                 }
-
-                if (includeComments && !string.IsNullOrWhiteSpace(film.Comment))
-                    sb.AppendFormat($" || {film.Comment} ||");
-
-                sb.AppendLine();
             }
 
             embed = embed
                 .WithColor(0, 255, 0)
-                .WithDescription(sb.ToString());
+                .WithFields(GetFields());
 
             return embed.Build();
         }
