@@ -203,7 +203,7 @@ namespace FilmsBot.Commands
                 rate.Date = DateTime.UtcNow;
             }
 
-            return new CommandResult($"You rate \"{film.Film.Format()}\" as {rating:0.0} ");
+            return new CommandResult($"You rated \"{film.Film.Format()}\" as {rating:0.0} ");
         }
 
         [SlashCommand("vote-start", "Start voting for next film")]
@@ -227,7 +227,7 @@ namespace FilmsBot.Commands
 
             DbContext.Sessions.Add(session);
 
-            return new CommandResult("Voting started. Place your bets!");
+            return new CommandResult("Voting has started. Place your bets!");
         }
 
         [SlashCommand("vote", "Place vote for specified film")]

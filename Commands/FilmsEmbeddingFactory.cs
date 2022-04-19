@@ -30,7 +30,7 @@ namespace FilmsBot.Commands
                 .Take(PageSize)
                 .ToListAsync();
             
-            var embed = new EmbedBuilder();
+            var embed = new EmbedBuilder();//.WithFields(new EmbedFieldBuilder());
             var totalPages = (int)Math.Ceiling(totalCount / (double)PageSize);
             if (totalCount > PageSize)
                 embed = embed.WithFooter($"Page 1 of {totalPages}");
@@ -57,7 +57,7 @@ namespace FilmsBot.Commands
                 embed = embed
                     .WithTitle($"\"{film.Format()}\"")
                     .WithColor(255, 0, 0)
-                    .WithDescription("Nobody rates this film.");
+                    .WithDescription("This film is not rated");
             }
 
             return embed.Build();
@@ -98,12 +98,12 @@ namespace FilmsBot.Commands
 
             var totalFilms = await dbContext.Films.Where(f => f.GuildId == guildChannel.GuildId).CountAsync();
             var embed = new EmbedBuilder()
-                .WithTitle($"\"{guildChannel.Name}\" server films:");
+                .WithTitle($"\"{guildChannel.Guild.Name}\" server films:");
 
             if (films.Count == 0)
                 return embed
                     .WithColor(255, 0, 0)
-                    .WithDescription("empty")
+                    .WithDescription("Films not added")
                     .Build();
 
             if (totalFilms > PageSize)
